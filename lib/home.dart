@@ -61,11 +61,40 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late Future<List<Alojamiento>> futureAlojamientos;
+  List<Alojamiento> alojamientos = []; // Lista completa de alojamientos
+  List<Alojamiento> filteredAlojamientos = []; // Lista filtrada
+  final TextEditingController searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     futureAlojamientos = fetchAlojamientos();
+    futureAlojamientos.then((data) {
+      setState(() {
+        alojamientos = data;
+        filteredAlojamientos = data; // Inicialmente, mostrar todos
+      });
+    });
+
+    // Agregar listener al campo de búsqueda para actualizar la lista filtrada
+    searchController.addListener(() {
+      filterAlojamientos();
+    });
+  }
+
+  void filterAlojamientos() {
+    String query = searchController.text.toLowerCase();
+    setState(() {
+      filteredAlojamientos = alojamientos.where((alojamiento) {
+        return alojamiento.descripcion.toLowerCase().contains(query);
+      }).toList();
+    });
+  }
+
+  @override
+  void dispose() {
+    searchController.dispose(); // Liberar el controlador al eliminar el widget
+    super.dispose();
   }
 
   @override
@@ -133,6 +162,7 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 16.0),
             TextField(
+              controller: searchController, // Controlador para la barra de búsqueda
               decoration: InputDecoration(
                 hintText: 'Buscar...',
                 prefixIcon: const Icon(Icons.search),
@@ -157,7 +187,7 @@ class _HomePageState extends State<HomePage> {
                     return const Center(child: Text('No hay alojamientos disponibles'));
                   } else {
                     return ListView(
-                      children: snapshot.data!
+                      children: filteredAlojamientos
                           .map((alojamiento) => buildAlojamientoCard(alojamiento))
                           .toList(),
                     );
@@ -311,11 +341,19 @@ class _HomePageState extends State<HomePage> {
           ),
           const SizedBox(height: 16),
           if (alojamiento.primeraImagen != null)
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16.0),
-              child: Image.network(
-                alojamiento.primeraImagen!,
-                fit: BoxFit.cover,
+            SizedBox(
+              height: 200,
+              child: PageView.builder(
+                itemCount: 1,
+                itemBuilder: (context, index) {
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(16.0),
+                    child: Image.network(
+                      alojamiento.primeraImagen!,
+                      fit: BoxFit.cover,
+                    ),
+                  );
+                },
               ),
             ),
           const SizedBox(height: 16),
@@ -330,7 +368,7 @@ class _HomePageState extends State<HomePage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  backgroundColor: Colors.grey[800]!, // Negro menos intenso
+                  backgroundColor: Colors.grey[800]!,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(24.0),
                     side: BorderSide(color: Colors.grey[800]!),
@@ -353,7 +391,7 @@ class _HomePageState extends State<HomePage> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Color(0xFF25D366), // Color verde tipo WhatsApp
+                  backgroundColor: Color(0xFF25D366),
                   foregroundColor: Colors.white,
                 ),
                 onPressed: () {
