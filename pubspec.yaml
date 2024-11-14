@@ -1,0 +1,33 @@
+name: stayhere
+description: "A new Flutter project."
+publish_to: 'none'
+version: 0.1.0
+
+environment:
+  sdk: ^3.5.4
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  http: ^0.13.3
+  shared_preferences: ^2.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  assets:
+      - assets/images/StayPandaHere.png
+      - assets/images/ImagenMain/Habitacion 1.jpg
+      - assets/images/ImagenMain/Habitacion 2.jpg
+      - assets/images/ImagenMain/Buscando.png
+      - assets/images/ImagenMain/Cuartos.png
+      - assets/images/ImagenMain/Disfruta.png
+  fonts:
+    - family: Inria Sans
+      fonts:
+        - asset: assets/fonts/InriaSans-Regular.ttf
+  uses-material-design: true
