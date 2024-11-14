@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-// Modelo de datos para Alojamiento
 class Alojamiento {
   final String usuarioNombre;
   final String descripcion;
@@ -64,6 +63,9 @@ class _HomePageState extends State<HomePage> {
   List<Alojamiento> alojamientos = []; // Lista completa de alojamientos
   List<Alojamiento> filteredAlojamientos = []; // Lista filtrada
   final TextEditingController searchController = TextEditingController();
+  bool isMapView = false; // Variable para controlar si estamos en el mapa o en la lista de alojamientos
+  bool isProfileView = false; // Variable para controlar si estamos viendo el perfil del usuario
+  bool isChatView = false; // Variable para controlar si estamos en la vista de chat
 
   @override
   void initState() {
@@ -100,100 +102,70 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF212F38),
-        title: Image.asset(
-          'assets/images/StayPandaHere.png',
-          height: 30,
-          fit: BoxFit.contain,
-        ),
-        centerTitle: true,
-        automaticallyImplyLeading: false,
-      ),
+      appBar: isProfileView || isChatView
+          ? null // No mostrar AppBar en las vistas de Perfil y Chat
+          : AppBar(
+              backgroundColor: const Color(0xFF212F38),
+              title: Image.asset(
+                'assets/images/StayPandaHere.png',
+                height: 30,
+                fit: BoxFit.contain,
+              ),
+              centerTitle: true,
+              automaticallyImplyLeading: false,
+            ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.black,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14.0),
+            if (!isProfileView && !isChatView) // Mostrar solo barra de búsqueda en vista de alojamientos
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: searchController, // Controlador para la barra de búsqueda
+                      decoration: InputDecoration(
+                        hintText: 'Buscar...',
+                        prefixIcon: const Icon(Icons.search),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                          borderSide: BorderSide.none,
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
                     ),
-                    onPressed: () {
-                      // Acción para el botón de Filtros
-                    },
-                    child: const Text('Filtros'),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 14.0),
-                    ),
-                    onPressed: () {
-                      // Acción para el botón de Inicio
-                    },
-                    child: const Text('Inicio'),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      padding: const EdgeInsets.symmetric(vertical: 14.0),
-                    ),
-                    onPressed: () {
-                      // Acción para el botón de Mapa
-                    },
-                    child: const Text('Mapa'),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16.0),
-            TextField(
-              controller: searchController, // Controlador para la barra de búsqueda
-              decoration: InputDecoration(
-                hintText: 'Buscar...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8.0),
-                  borderSide: BorderSide.none,
-                ),
-                filled: true,
-                fillColor: Colors.white,
+                ],
               ),
-            ),
             const SizedBox(height: 16.0),
             Expanded(
-              child: FutureBuilder<List<Alojamiento>>(
-                future: futureAlojamientos,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}'));
-                  } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(child: Text('No hay alojamientos disponibles'));
-                  } else {
-                    return ListView(
-                      children: filteredAlojamientos
-                          .map((alojamiento) => buildAlojamientoCard(alojamiento))
-                          .toList(),
-                    );
-                  }
-                },
-              ),
+              child: isProfileView
+                  ? buildProfileView()
+                  : isChatView
+                      ? buildChatView()
+                      : isMapView
+                          ? Container(
+                              color: Colors.grey, // Rectángulo gris en lugar del mapa
+                            )
+                          : FutureBuilder<List<Alojamiento>>(
+                              future: futureAlojamientos,
+                              builder: (context, snapshot) {
+                                if (snapshot.connectionState == ConnectionState.waiting) {
+                                  return const Center(child: CircularProgressIndicator());
+                                } else if (snapshot.hasError) {
+                                  return Center(child: Text('Error: ${snapshot.error}'));
+                                } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                  return const Center(child: Text('No hay alojamientos disponibles'));
+                                } else {
+                                  return ListView(
+                                    children: filteredAlojamientos
+                                        .map((alojamiento) => buildAlojamientoCard(alojamiento))
+                                        .toList(),
+                                  );
+                                }
+                              },
+                            ),
             ),
           ],
         ),
@@ -206,15 +178,84 @@ class _HomePageState extends State<HomePage> {
             padding: const EdgeInsets.symmetric(vertical: 6.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: const [
-                Icon(Icons.home, color: Colors.white, size: 30),
-                Icon(Icons.person, color: Colors.white, size: 30),
-                Icon(Icons.chat, color: Colors.white, size: 30),
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.home, color: Colors.white, size: 30),
+                  onPressed: () {
+                    setState(() {
+                      isMapView = false;
+                      isProfileView = false;
+                      isChatView = false; // Regresar a la vista de inicio
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.chat, color: Colors.white, size: 30), // Icono de chat
+                  onPressed: () {
+                    setState(() {
+                      isChatView = true;
+                      isProfileView = false;
+                      isMapView = false; // Cambiar a la vista de chat
+                    });
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.person, color: Colors.white, size: 30), // Icono de usuario
+                  onPressed: () {
+                    setState(() {
+                      isProfileView = true; // Cambiar a la vista del perfil
+                      isMapView = false; // Asegurarse de que el mapa no esté activo
+                      isChatView = false; // Asegurarse de que la vista de chat no esté activa
+                    });
+                  },
+                ),
               ],
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget buildProfileView() {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Perfil de Usuario',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text('Nombre de usuario: ${widget.username ?? "No registrado"}'),
+          const SizedBox(height: 8),
+          // Aquí puedes agregar más datos del usuario que tengas disponibles
+          // Ejemplo:
+          Text('Correo: usuario@ejemplo.com'),
+          Text('Teléfono: 123-456-789'),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              // Acción para editar el perfil, si es necesario
+            },
+            child: const Text('Editar perfil'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildChatView() {
+    return Center(
+      child: Text("Vista de Chat"),
     );
   }
 
@@ -282,7 +323,7 @@ class _HomePageState extends State<HomePage> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      backgroundColor: Colors.grey[800]!, // Negro menos intenso
+                      backgroundColor: Colors.grey[800]!,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24.0),
                         side: BorderSide(color: Colors.grey[800]!),
