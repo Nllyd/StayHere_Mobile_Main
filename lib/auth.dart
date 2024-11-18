@@ -1,5 +1,4 @@
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -26,6 +25,8 @@ class _AuthPageState extends State<AuthPage> {
   String? jwtToken; // Token JWT que obtendremos del backend
   final TextEditingController captchaController = TextEditingController();
   late String captchaCode;
+  bool _obscurePassword = true; // Para mostrar/ocultar contraseña
+  final Color buttonColor = Color(0xFF212F38); // Nuevo color de botón
 
   @override
   void initState() {
@@ -67,8 +68,12 @@ class _AuthPageState extends State<AuthPage> {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       jwtToken = data['access'];
+
+      // Guardar el correo electrónico ingresado
       SharedPreferences prefs = await SharedPreferences.getInstance();
       await prefs.setString('jwtToken', jwtToken!);
+      await prefs.setString('userEmail', emailController.text);
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -94,7 +99,7 @@ class _AuthPageState extends State<AuthPage> {
         'nombre': nameController.text,
         'telefono': phoneController.text,
         'fecha_nacimiento': selectedDate != null
-            ? '${selectedDate!.year}-${selectedDate!.month}-${selectedDate!.day}'
+            ? '${selectedDate!.year}-${selectedDate!.month.toString().padLeft(2, '0')}-${selectedDate!.day.toString().padLeft(2, '0')}'
             : null,
       }),
     );
@@ -132,9 +137,9 @@ class _AuthPageState extends State<AuthPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text(
+          const Text(
             'Por favor, ingresa el código CAPTCHA',
-            style: const TextStyle(fontSize: 18),
+            style: TextStyle(fontSize: 18),
           ),
           const SizedBox(height: 20),
           _buildCaptchaDisplay(),
@@ -149,6 +154,9 @@ class _AuthPageState extends State<AuthPage> {
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _verifyCaptcha,
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.white, backgroundColor: buttonColor, // Texto blanco
+            ),
             child: const Text('Verificar CAPTCHA'),
           ),
         ],
@@ -240,19 +248,39 @@ class _AuthPageState extends State<AuthPage> {
           const SizedBox(height: 20),
           TextField(
             controller: passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Contraseña'),
+            obscureText: _obscurePassword,
+            decoration: InputDecoration(
+              labelText: 'Contraseña',
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _showCaptchaModal,
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.white, backgroundColor: buttonColor, // Texto blanco
+            ),
             child: const Text('Verificar CAPTCHA'),
           ),
+          const SizedBox(height: 10),
           if (isCaptchaVerified)
             ElevatedButton(
               onPressed: _login,
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white, backgroundColor: buttonColor, // Texto blanco
+              ),
               child: const Text('Iniciar Sesión'),
             ),
+          const SizedBox(height: 10),
           TextButton(
             onPressed: () => _pageController.jumpToPage(1),
             child: const Text('¿Aún no estás registrado? Regístrate aquí'),
@@ -285,8 +313,20 @@ class _AuthPageState extends State<AuthPage> {
           const SizedBox(height: 20),
           TextField(
             controller: passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Contraseña'),
+            obscureText: _obscurePassword,
+            decoration: InputDecoration(
+              labelText: 'Contraseña',
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _obscurePassword = !_obscurePassword;
+                  });
+                },
+              ),
+            ),
           ),
           const SizedBox(height: 20),
           TextField(
@@ -297,13 +337,21 @@ class _AuthPageState extends State<AuthPage> {
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _showCaptchaModal,
+            style: ElevatedButton.styleFrom(
+              foregroundColor: Colors.white, backgroundColor: buttonColor, // Texto blanco
+            ),
             child: const Text('Verificar CAPTCHA'),
           ),
+          const SizedBox(height: 10),
           if (isCaptchaVerified)
             ElevatedButton(
               onPressed: _register,
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white, backgroundColor: buttonColor, // Texto blanco
+              ),
               child: const Text('Registrar'),
             ),
+          const SizedBox(height: 10),
           TextButton(
             onPressed: () => _pageController.jumpToPage(0),
             child: const Text('¿Ya tienes una cuenta? Inicia Sesión'),

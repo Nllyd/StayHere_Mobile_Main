@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class Alojamiento {
   final String usuarioNombre;
@@ -35,6 +36,52 @@ class Alojamiento {
           ? baseUrl + json['primera_imagen']
           : null, // Combina el dominio base con la ruta de la imagen
     );
+  }
+}
+
+class Usuario {
+  final String email;
+  final String nombre;
+  final String telefono;
+  final String fechaNacimiento;
+  final int edad;
+
+  Usuario({
+    required this.email,
+    required this.nombre,
+    required this.telefono,
+    required this.fechaNacimiento,
+    required this.edad,
+  });
+
+  factory Usuario.fromJson(Map<String, dynamic> json) {
+    return Usuario(
+      email: json['email'],
+      nombre: json['nombre'],
+      telefono: json['telefono'],
+      fechaNacimiento: json['fecha_nacimiento'],
+      edad: json['edad'],
+    );
+  }
+}
+
+Future<Usuario> fetchUsuario() async {
+  // Obtener el ID del usuario desde SharedPreferences
+  SharedPreferences prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getInt('userId');  // Obtienes el userId almacenado
+
+  if (userId == null) {
+    throw Exception('No hay usuario logueado'); // Puedes manejarlo de otra manera si prefieres.
+  }
+
+  final response = await http.get(
+    Uri.parse('https://stayhere-web.onrender.com/api/usuarios/$userId/'),
+  );
+
+  if (response.statusCode == 200) {
+    return Usuario.fromJson(json.decode(response.body));
+  } else {
+    throw Exception('Failed to load user data');
   }
 }
 
@@ -218,38 +265,52 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget buildProfileView() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Perfil de Usuario',
-            style: const TextStyle(
-              fontSize: 24,
-              fontWeight: FontWeight.bold,
+    return FutureBuilder<Usuario>(
+      future: fetchUsuario(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        } else if (!snapshot.hasData) {
+          return const Center(child: Text('No se pudo cargar el perfil'));
+        } else {
+          final usuario = snapshot.data!;
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Perfil de Usuario',
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text('Nombre de usuario: ${usuario.nombre}'),
+                const SizedBox(height: 8),
+                Text('Correo: ${usuario.email}'),
+                Text('Teléfono: ${usuario.telefono}'),
+                Text('Fecha de nacimiento: ${usuario.fechaNacimiento}'),
+                Text('Edad: ${usuario.edad}'),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                  ),
+                  onPressed: () {
+                    // Acción para editar el perfil, si es necesario
+                  },
+                  child: const Text('Editar perfil'),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Text('Nombre de usuario: ${widget.username ?? "No registrado"}'),
-          const SizedBox(height: 8),
-          // Aquí puedes agregar más datos del usuario que tengas disponibles
-          // Ejemplo:
-          Text('Correo: usuario@ejemplo.com'),
-          Text('Teléfono: 123-456-789'),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.black,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              // Acción para editar el perfil, si es necesario
-            },
-            child: const Text('Editar perfil'),
-          ),
-        ],
-      ),
+          );
+        }
+      },
     );
   }
 
