@@ -12,6 +12,9 @@ dependencies:
   cupertino_icons: ^1.0.8
   http: ^0.13.3
   shared_preferences: ^2.1.0
+  jwt_decoder: ^2.0.1
+  image_picker: ^0.8.5+3
+  url_launcher: ^6.0.20
 
 dev_dependencies:
   flutter_test:
