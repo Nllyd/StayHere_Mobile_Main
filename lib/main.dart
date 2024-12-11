@@ -1,21 +1,22 @@
 import 'package:flutter/material.dart';
-import 'auth.dart'; // Importa auth.dart
+import 'auth.dart'; // Importa tu AuthPage
+import 'habitaciones.dart'; // Importa tu HomePage
 
 void main() {
-  runApp(const MyApp());
+  runApp(MyApp());
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Mi App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-      ),
-      home: const HomePage(), // Página principal
+      title: 'StayHere',
+      initialRoute: '/', // Ruta inicial
+      routes: {
+        '/': (context) => HomePage(), // Ruta para HomePage
+        '/auth': (context) => AuthPage(), // Ruta para AuthPage
+        '/habitaciones': (context) => HabitacionesPage(), // Ruta para AuthPage
+      },
     );
   }
 }
@@ -103,6 +104,7 @@ class HomePage extends StatelessWidget {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFDE5D5D),
+                      textStyle: const TextStyle(color: Colors.white),
                       padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 32.0),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(30.0),

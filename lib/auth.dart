@@ -1,314 +1,298 @@
+import 'dart:convert';
 import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'home.dart'; // Importar la página de HomePage
 
 class AuthPage extends StatefulWidget {
-  const AuthPage({super.key});
+  const AuthPage({Key? key}) : super(key: key);
 
   @override
   _AuthPageState createState() => _AuthPageState();
 }
 
 class _AuthPageState extends State<AuthPage> {
-  final PageController _pageController = PageController();
+  final _formKey = GlobalKey<FormState>();
+  String email = '';
+  String password = '';
+  bool isLogin = true;
+  String captcha = '';
+  String userCaptchaInput = '';
   bool isCaptchaVerified = false;
-  final TextEditingController emailController = TextEditingController();
-  final TextEditingController passwordController = TextEditingController();
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController phoneController = TextEditingController();
-  DateTime? selectedDate;
-  int? age;
-  String errorMessage = ''; // Mensaje de error
-  String? jwtToken; // Token JWT que obtendremos del backend
-  final TextEditingController captchaController = TextEditingController();
-  late String captchaCode;
 
   @override
   void initState() {
     super.initState();
-    captchaCode = _generateCaptchaCode();
+    _generateCaptcha();
   }
 
-  // Funciones comunes
-  void _showErrorSnackBar(String message) {
+  // Generar CAPTCHA aleatorio
+  void _generateCaptcha() {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#\$%^&*()';
+    final random = Random();
+    captcha = List.generate(4, (index) => characters[random.nextInt(characters.length)]).join();
+  }
+
+  // Función para hacer la solicitud de login
+  Future<void> _login() async {
+    final url = Uri.parse('https://stayhere-web.onrender.com/api/login/'); // URL de la API de login
+
+    // Preparar los datos para la solicitud
+    final body = json.encode({
+      'email': email,
+      'password': password,
+    });
+
+    // Hacer la solicitud POST
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      final responseData = json.decode(response.body);
+      if (responseData['success']) {
+        // Guardar el correo electrónico en SharedPreferences
+        final prefs = await SharedPreferences.getInstance();
+        prefs.setString('email', email);
+
+        // Si la respuesta es exitosa, navegar a la página de habitaciones
+        Navigator.pushReplacementNamed(context, '/habitaciones');
+      } else {
+        // Mostrar el mensaje de error como un SnackBar
+        _showErrorSnackbar('Credenciales incorrectas');
+      }
+    } else {
+      // Mostrar el mensaje de error si la respuesta no es 200
+      _showErrorSnackbar('Error al iniciar sesión. Intenta de nuevo.');
+    }
+  }
+
+  // Función para mostrar el mensaje de error como un SnackBar
+  void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: Colors.red,
+        duration: const Duration(seconds: 3),
       ),
     );
   }
 
-  // Funciones para la página de login
-  Future<void> _login() async {
-    if (!isCaptchaVerified) {
-      _showErrorSnackBar('Debes verificar el CAPTCHA antes de iniciar sesión.');
-      return;
-    }
-
-    _showLoadingDialog();
-    final url = Uri.parse('https://stayhere-web.onrender.com/api/token/');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'email': emailController.text,
-        'password': passwordController.text,
-      }),
-    );
-    _hideLoadingDialog();
-
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      jwtToken = data['access'];
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('jwtToken', jwtToken!);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomePage(username: emailController.text),
-        ),
-      );
+  // Verificar si el CAPTCHA ingresado por el usuario es correcto
+  void _verifyCaptcha() {
+    if (userCaptchaInput == captcha) {
+      setState(() {
+        isCaptchaVerified = true;
+      });
     } else {
-      _showErrorSnackBar('Datos incorrectos o error en el servidor');
+      setState(() {
+        isCaptchaVerified = false;
+      });
+      _showErrorSnackbar('CAPTCHA incorrecto. Intenta de nuevo.');
     }
   }
 
-  // Funciones para la página de registro
-  Future<void> _register() async {
-    final url = Uri.parse('https://stayhere-web.onrender.com/api/usuarios/');
-    final response = await http.post(
-      url,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode({
-        'email': emailController.text,
-        'password': passwordController.text,
-        'nombre': nameController.text,
-        'telefono': phoneController.text,
-        'fecha_nacimiento': selectedDate != null
-            ? '${selectedDate!.year}-${selectedDate!.month}-${selectedDate!.day}'
-            : null,
-      }),
-    );
-
-    if (response.statusCode == 201) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => HomePage(username: nameController.text),
-        ),
-      );
-    } else {
-      final data = jsonDecode(response.body);
-      _showErrorSnackBar(data['error'] ?? 'Error en el registro. Inténtalo de nuevo.');
-    }
+  // Función para generar colores aleatorios (excepto rojo)
+  Color _getRandomColor() {
+    List<Color> colors = [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.brown,
+      Colors.indigo,
+      Colors.yellow
+    ];
+    return colors[Random().nextInt(colors.length)];
   }
 
-  // Función para mostrar el modal de CAPTCHA
-  void _showCaptchaModal() {
-    showModalBottomSheet(
+  // Mostrar el modal para CAPTCHA
+  void _showCaptchaDialog() {
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-        ),
-        child: _buildCaptchaModal(),
-      ),
-    );
-  }
-
-  Widget _buildCaptchaModal() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Por favor, ingresa el código CAPTCHA',
-            style: const TextStyle(fontSize: 18),
-          ),
-          const SizedBox(height: 20),
-          _buildCaptchaDisplay(),
-          const SizedBox(height: 20),
-          TextField(
-            controller: captchaController,
-            decoration: const InputDecoration(
-              labelText: 'Ingrese el código CAPTCHA',
-              border: OutlineInputBorder(),
+      builder: (ctx) => AlertDialog(
+        title: const Text('Verificar CAPTCHA'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: const Color.fromARGB(255, 235, 110, 101),
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              child: Center(
+                child: Text(
+                  captcha,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: _getRandomColor(),
+                  ),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 20),
+            const SizedBox(height: 10),
+            TextFormField(
+              decoration: const InputDecoration(
+                labelText: 'Ingresa el CAPTCHA',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (value) {
+                setState(() {
+                  userCaptchaInput = value;
+                });
+              },
+            ),
+          ],
+        ),
+        actions: [
           ElevatedButton(
-            onPressed: _verifyCaptcha,
-            child: const Text('Verificar CAPTCHA'),
+            onPressed: () {
+              _verifyCaptcha();
+              Navigator.of(ctx).pop(); // Cerrar el modal
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF212F38), // Color del header
+            ),
+            child: const Text('Verificar'),
           ),
         ],
       ),
     );
   }
 
-  // CAPTCHA
-  String _generateCaptchaCode() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789*.:@#';
-    return List.generate(4, (index) => chars[Random().nextInt(chars.length)]).join();
-  }
-
-  Widget _buildCaptchaDisplay() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: captchaCode.split('').map((char) {
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8.0),
-          child: Text(
-            char,
-            style: TextStyle(
-              fontSize: 40,
-              fontWeight: FontWeight.bold,
-              color: Color((Random().nextDouble() * 0xFFFFFF).toInt()).withOpacity(1.0),
-            ),
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  void _verifyCaptcha() {
-    if (captchaController.text == captchaCode) {
-      setState(() {
-        isCaptchaVerified = true;
-      });
-      Navigator.pop(context);
-    } else {
-      _showErrorSnackBar('Código incorrecto. Intenta de nuevo.');
-    }
-  }
-
-  // Diálogo de carga
-  void _showLoadingDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-  }
-
-  void _hideLoadingDialog() {
-    Navigator.of(context, rootNavigator: true).pop();
-  }
-
-  // UI
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Autenticación'),
+        backgroundColor: const Color(0xFF212F38),
       ),
-      body: PageView(
-        controller: _pageController,
-        children: [
-          _buildLoginPage(),
-          _buildRegisterPage(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoginPage() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const Text(
-            'Iniciar Sesión',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 40),
+              Text(
+                isLogin ? 'Iniciar sesión' : 'Registrarse',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF212F38),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                decoration: const InputDecoration(
+                  labelText: 'Correo electrónico',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Por favor ingresa tu correo electrónico';
+                  }
+                  if (!RegExp(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").hasMatch(value)) {
+                    return 'Por favor ingresa un correo válido';
+                  }
+                  return null;
+                },
+                onChanged: (value) {
+                  setState(() {
+                    email = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'Contraseña',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Por favor ingresa tu contraseña';
+                  }
+                  return null;
+                },
+                onChanged: (value) {
+                  setState(() {
+                    password = value;
+                  });
+                },
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: _showCaptchaDialog, // Abre el modal para CAPTCHA
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  backgroundColor: const Color(0xFF212F38),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                ),
+                child: const Text(
+                  'Verificar CAPTCHA',
+                  style: TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Mostrar el mensaje si el CAPTCHA no se ha verificado
+              if (!isCaptchaVerified)
+                const Text(
+                  'Por favor verifica el CAPTCHA antes de iniciar sesión.',
+                  style: TextStyle(fontSize: 12, color: Colors.red),
+                  textAlign: TextAlign.center,
+                ),
+              const SizedBox(height: 20),
+              // Botón de login solo si el CAPTCHA es verificado
+              ElevatedButton(
+                onPressed: isCaptchaVerified
+                    ? () {
+                        if (_formKey.currentState?.validate() ?? false) {
+                          _login();
+                        }
+                      }
+                    : null,
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16.0),
+                  backgroundColor: const Color(0xFF212F38),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30.0),
+                  ),
+                ),
+                child: Text(
+                  isLogin ? 'Iniciar sesión' : 'Registrarse',
+                  style: const TextStyle(fontSize: 18, color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 20),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    isLogin = !isLogin; // Cambiar entre login y registro
+                  });
+                },
+                child: Text(
+                  isLogin
+                      ? '¿No tienes cuenta? Regístrate aquí'
+                      : '¿Ya tienes cuenta? Inicia sesión',
+                  style: const TextStyle(fontSize: 16, color: Color(0xFF212F38)),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: emailController,
-            decoration: const InputDecoration(labelText: 'Correo Electrónico'),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Contraseña'),
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _showCaptchaModal,
-            child: const Text('Verificar CAPTCHA'),
-          ),
-          if (isCaptchaVerified)
-            ElevatedButton(
-              onPressed: _login,
-              child: const Text('Iniciar Sesión'),
-            ),
-          TextButton(
-            onPressed: () => _pageController.jumpToPage(1),
-            child: const Text('¿Aún no estás registrado? Regístrate aquí'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildRegisterPage() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          const Text(
-            'Registro',
-            style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: nameController,
-            decoration: const InputDecoration(labelText: 'Nombre y Apellidos'),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: emailController,
-            decoration: const InputDecoration(labelText: 'Correo Electrónico'),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: passwordController,
-            obscureText: true,
-            decoration: const InputDecoration(labelText: 'Contraseña'),
-          ),
-          const SizedBox(height: 20),
-          TextField(
-            controller: phoneController,
-            decoration: const InputDecoration(labelText: 'Número de Teléfono'),
-            keyboardType: TextInputType.phone,
-          ),
-          const SizedBox(height: 20),
-          ElevatedButton(
-            onPressed: _showCaptchaModal,
-            child: const Text('Verificar CAPTCHA'),
-          ),
-          if (isCaptchaVerified)
-            ElevatedButton(
-              onPressed: _register,
-              child: const Text('Registrar'),
-            ),
-          TextButton(
-            onPressed: () => _pageController.jumpToPage(0),
-            child: const Text('¿Ya tienes una cuenta? Inicia Sesión'),
-          ),
-        ],
+        ),
       ),
     );
   }
